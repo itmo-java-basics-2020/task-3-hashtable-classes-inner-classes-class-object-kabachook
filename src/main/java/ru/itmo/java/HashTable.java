@@ -1,35 +1,14 @@
 package ru.itmo.java;
 
-import java.util.Map;
-
 public class HashTable {
     private static final int DEFAULT_CAPACITY = 500;
     private static final float DEFAULT_LOAD_FACTOR = .5f;
     private static final int HASH_GAP = 127;
     private Entry[] elements;
-    private boolean[] deleted;
     private float loadFactor;
     private int size = 0;
     private int capacity;
     private int threshold;
-
-    private class Entry {
-        Object key;
-        Object value;
-
-        public Entry(Object key, Object value) {
-            this.key = key;
-            this.value = value;
-        }
-
-        @Override
-        public String toString() {
-            return "Entry{" +
-                    "key=" + key +
-                    ", value=" + value +
-                    '}';
-        }
-    }
 
     public HashTable(int capacity, float loadFactor) {
         if (capacity < 0) {
@@ -39,13 +18,12 @@ public class HashTable {
             throw new IllegalArgumentException("Load factor must be in range from 0 to 1");
         }
 
-        if (capacity < DEFAULT_CAPACITY){
+        if (capacity < DEFAULT_CAPACITY) {
             capacity = DEFAULT_CAPACITY;
         }
 
         this.capacity = capacity;
         this.elements = new Entry[capacity];
-        this.deleted = new boolean[capacity];
         this.loadFactor = loadFactor;
         this.threshold = (int) (this.capacity * this.loadFactor);
     }
@@ -58,25 +36,31 @@ public class HashTable {
         return (obj.hashCode() % this.capacity + this.capacity) % this.capacity;
     }
 
-    private int nextIteration(int hash){
+    private int nextIteration(int hash) {
         return (hash + HASH_GAP) % this.capacity;
     }
 
+    // Searches for element
     private int probe(Object key) {
         int hashCode = this.hash(key);
 
-        while (this.deleted[hashCode] || this.elements[hashCode] != null && !this.elements[hashCode].key.equals(key)) {
+        int i = 0;
+        while (i < this.capacity && this.elements[hashCode] != null && (!key.equals(this.elements[hashCode].key) || this.elements[hashCode].deleted)) {
             hashCode = nextIteration(hashCode);
+            i++;
         }
+
         return hashCode;
     }
 
+    // Searches for place to put
     private int probePut(Object key) {
         int hashCode = this.hash(key);
 
-        while (this.elements[hashCode] != null) {
+        while (this.elements[hashCode] != null && !this.elements[hashCode].deleted) {
             hashCode = nextIteration(hashCode);
         }
+
         return hashCode;
     }
 
@@ -84,13 +68,12 @@ public class HashTable {
         var oldElements = this.elements;
 
         this.elements = new Entry[this.capacity * 2];
-        this.deleted = new boolean[this.capacity * 2];
         this.threshold = (int) (loadFactor * this.capacity * 2);
         this.size = 0;
         this.capacity *= 2;
 
         for (var element : oldElements) {
-            if (element != null) {
+            if (element != null && !element.deleted) {
                 this.put(element.key, element.value);
             }
         }
@@ -106,19 +89,16 @@ public class HashTable {
         if (this.elements[idx] == null) {
             idx = probePut(key);
 
-            if (this.deleted[idx]) {
-                this.deleted[idx] = false;
-            }
 
             this.elements[idx] = new Entry(key, value);
             size++;
-
             return null;
         }
 
+        if (this.elements[idx].deleted) size++;
+
         Entry oldElement = this.elements[idx];
         this.elements[idx] = new Entry(key, value);
-
         return oldElement.value;
     }
 
@@ -134,14 +114,28 @@ public class HashTable {
 
         size--;
         var deletedElement = this.elements[idx];
-
-        this.deleted[idx] = true;
-        this.elements[idx] = null;
+        this.elements[idx] = new Entry(null, null, true);
 
         return deletedElement.value;
     }
 
     public int size() {
         return this.size;
+    }
+
+    private class Entry {
+        Object key;
+        Object value;
+        boolean deleted;
+
+        public Entry(Object key, Object value, boolean deleted) {
+            this.key = key;
+            this.value = value;
+            this.deleted = deleted;
+        }
+
+        public Entry(Object key, Object value) {
+            this(key, value, false);
+        }
     }
 }
